@@ -6,7 +6,7 @@ use DBIx::Inspector;
 use DBIx::Inspector::Iterator;
 use Carp ();
 
-our $VERSION = "0.01";
+our $VERSION = "0.02";
 
 # XXX copy from SQL::Translator::Parser::DBI-1.59
 use constant DRIVERS => {
@@ -187,7 +187,8 @@ sub _statistics_info {
     );
 }
 
-package DBIx::Inspector::Statics;
+package # hide from PAUSE
+    DBIx::Inspector::Statics;
 
 sub new {
     my $class = shift;

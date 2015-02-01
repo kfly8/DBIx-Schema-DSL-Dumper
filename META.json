@@ -58,14 +58,14 @@
    "release_status" : "unstable",
    "resources" : {
       "bugtracker" : {
-         "web" : "https://github.com/kfly8/DBIx-Schmea-DSL-Dumper/issues"
+         "web" : "https://github.com/kfly8/DBIx-Schema-DSL-Dumper/issues"
       },
-      "homepage" : "https://github.com/kfly8/DBIx-Schmea-DSL-Dumper",
+      "homepage" : "https://github.com/kfly8/DBIx-Schema-DSL-Dumper",
       "repository" : {
          "type" : "git",
-         "url" : "git://github.com/kfly8/DBIx-Schmea-DSL-Dumper.git",
-         "web" : "https://github.com/kfly8/DBIx-Schmea-DSL-Dumper"
+         "url" : "git://github.com/kfly8/DBIx-Schema-DSL-Dumper.git",
+         "web" : "https://github.com/kfly8/DBIx-Schema-DSL-Dumper"
       }
    },
-   "version" : "0.01"
+   "version" : "0.02"
 }
