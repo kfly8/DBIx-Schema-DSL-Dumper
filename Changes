@@ -2,5 +2,7 @@ Revision history for Perl extension DBIx-Schema-DSL-Dumper
 
 {{$NEXT}}
 
-    - original version
+0.01 2015-02-01T14:02:34Z
+
+    - initial
 
