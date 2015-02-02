@@ -68,52 +68,69 @@ sub _render_table {
     my ($table_info, $args) = @_;
 
     my $ret = "";
-    my @primary_key_names = map { $_->name } $table_info->primary_key;
 
     $ret .= sprintf("create_table '%s' => columns {\n", $table_info->name);
 
     for my $col ($table_info->columns) {
-
-        my $col_ret = "";
-        $col_ret .= sprintf("    column '%s'", $col->name);
-
-        my ($type, @opt) = split / /, $col->type_name;
-
-        $col_ret .= sprintf(", '%s'", $type);
-
-        my %opt = map { lc($_) => 1 } @opt;
-
-        $col_ret .= ", signed"   if $opt{signed};
-        $col_ret .= ", unsigned" if $opt{unsigned} && !$args->{default_unsigned};
-        $col_ret .= sprintf(", size => %d", $col->column_size)  if defined $col->column_size;
-
-        $col_ret .= ", null"     if $col->nullable;
-        $col_ret .= ", not_null" if !$col->nullable && !$args->{default_not_null};
-        if (defined $col->column_def) {
-            my $column_def = $col->column_def;
-
-            # XXX workaround for SQLite ??
-            $column_def =~ s/^'//;
-            $column_def =~ s/'$//;
-
-            $col_ret .= sprintf(", default => '%s'", $column_def)
-        }
-
-        if (@primary_key_names == 1 && $primary_key_names[0] eq $col->name) {
-            $col_ret .= ", primary_key";
-        }
-
-        $col_ret .= ", auto_increment" if $opt{auto_increment};
-
-        $ret .= "$col_ret;\n";
+        $ret .= _render_column($col, $table_info, $args);
     }
 
-    if (@primary_key_names > 1) {
+    $ret .= _render_index($table_info, $args);
+
+    $ret .= "};\n\n";
+
+    return $ret;
+}
+
+sub _render_column {
+    my ($column_info, $table_info, $args) = @_;
+
+    my $ret = "";
+    $ret .= sprintf("    column '%s'", $column_info->name);
+
+    my ($type, @opt) = split / /, $column_info->type_name;
+
+    $ret .= sprintf(", '%s'", $type);
+
+    my %opt = map { lc($_) => 1 } @opt;
+
+    $ret .= ", signed"   if $opt{signed};
+    $ret .= ", unsigned" if $opt{unsigned} && !$args->{default_unsigned};
+    $ret .= sprintf(", size => %d", $column_info->column_size)  if defined $column_info->column_size;
+
+    $ret .= ", null"     if $column_info->nullable;
+    $ret .= ", not_null" if !$column_info->nullable && !$args->{default_not_null};
+    if (defined $column_info->column_def) {
+        my $column_def = $column_info->column_def;
+
+        # XXX workaround for SQLite ??
+        $column_def =~ s/^'//;
+        $column_def =~ s/'$//;
+
+        $ret .= sprintf(", default => '%s'", $column_def)
+    }
+
+    $ret .= ", auto_increment" if $opt{auto_increment};
+
+    $ret .= ";\n";
+
+    return $ret;
+}
+
+sub _render_index {
+    my ($table_info, $args) = @_;
+
+    my @primary_key_names = map { $_->name } $table_info->primary_key;
+    my @fk_list           = $table_info->fk_foreign_keys;
+
+    my $ret = "";
+
+    # primary key
+    if (@primary_key_names) {
         $ret .= "\n";
         $ret .= sprintf("    set_primary_key('%s');\n", join "','", @primary_key_names);
     }
 
-    my @fk_list = $table_info->fk_foreign_keys;
 
     # index
     {
@@ -138,7 +155,7 @@ sub _render_table {
                         $index_keys[0]->non_unique ? '' : 'unique_',
                         $index_name,
                         (join ",", (map { q{'}.$_.q{'} } @column_names)),
-                        !$index_keys[0]->non_unique && $index_keys[0]->type ? sprintf(", '%s'", $index_keys[0]->type) : '',
+                        $index_keys[0]->non_unique && $index_keys[0]->type ? sprintf(", '%s'", $index_keys[0]->type) : '',
                     );
         }
     }
@@ -155,8 +172,6 @@ sub _render_table {
             }
         }
     }
-
-    $ret .= "};\n\n";
 
     return $ret;
 }
