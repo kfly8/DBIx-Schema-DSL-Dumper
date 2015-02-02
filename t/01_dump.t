@@ -54,7 +54,7 @@ my $dbh = DBI->connect($mysqld->dsn(dbname => 'test'), {RaiseError => 1}) or die
 # initialize
 my $output = Foo::DSL->output;
 
-$dbh->do($_) for split /;/, $output;
+$dbh->do($_) for grep { $_ !~ /^\s+$/ } split /;/, $output;
 
 subtest "dump all tables" => sub {
 
