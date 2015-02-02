@@ -48,11 +48,12 @@
       },
       "test" : {
          "requires" : {
-            "DBD::SQLite" : "0",
+            "DBD::mysql" : "0",
             "DBI" : "0",
             "DBIx::Schema::DSL" : "0",
             "Test::More" : "0.98",
-            "Test::Requires" : "0"
+            "Test::Requires" : "0",
+            "Test::mysqld" : "0"
          }
       }
    },

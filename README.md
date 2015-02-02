@@ -24,7 +24,7 @@ I haven't written document and test script yet.
 
 # SEE ALSO
 
-[Teng::Schema::Dumper](https://metacpan.org/pod/Teng::Schema::Dumper)
+[DBIx::Schema::DSL](https://metacpan.org/pod/DBIx::Schema::DSL), [Teng::Schema::Dumper](https://metacpan.org/pod/Teng::Schema::Dumper)
 
 # LICENSE
 
