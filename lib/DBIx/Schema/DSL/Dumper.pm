@@ -104,6 +104,11 @@ sub _render_column {
 
     my %opt = map { lc($_) => 1 } @opt;
 
+    if (lc($type) eq 'enum') {
+        # XXX
+        $ret .= sprintf(" => ['%s']", join "','", @{$column_info->{MYSQL_VALUES}});
+    }
+
     $ret .= ", signed"   if $opt{signed};
     $ret .= ", unsigned" if $opt{unsigned} && !$args->{default_unsigned};
 
@@ -113,8 +118,11 @@ sub _render_column {
             # XXX
             $column_size = sprintf("[%d, %d]", $column_info->column_size, $column_info->{DECIMAL_DIGITS});
         }
+        elsif (lc($type) eq 'enum') {
+            undef $column_size;
+        }
 
-        $ret .= sprintf(", size => %s", $column_size)
+        $ret .= sprintf(", size => %s", $column_size) if $column_size;
     }
 
     $ret .= ", null"     if $column_info->nullable;
