@@ -4,6 +4,7 @@ use Test::More;
 use Test::Requires 'DBD::mysql';
 use Test::mysqld;
 use DBI;
+use DBI qw(:sql_types);
 use DBIx::Schema::DSL::Dumper;
 
 
@@ -16,23 +17,23 @@ database 'MySQL';
 
 create_table 'user' => columns {
     integer 'id',   primary_key, auto_increment;
-    varchar 'name', null;
+    varchar 'name', not_null;
+    # MySQL datatype
+#    enum    'blood' => ['A', 'B', 'AB', 'O'], null;
 };
 
 create_table 'book' => columns {
     integer 'id',   primary_key, auto_increment;
-    varchar 'name', null;
+    varchar 'name', not_null;
     integer 'author_id';
     decimal 'price', 'size' => [4,2];
-
-    add_index 'author_id_idx' => ['author_id'];
 
     belongs_to 'author';
 };
 
 create_table 'author' => columns {
     primary_key 'id';
-    varchar 'name';
+    varchar 'name', not_null;
     decimal 'height', 'precision' => 4, 'scale' => 1;
 
     add_index 'height_idx' => ['height'];
@@ -80,6 +81,100 @@ subtest "dump all tables" => sub {
             is $table->equals($other), 1;
         }
     }
+
+    subtest 'test each table' => sub {
+
+        subtest 'user' => sub {
+            my $user = Bar::DSL->context->schema->get_table('user');
+            isa_ok $user, 'SQL::Translator::Schema::Table';
+
+            my $id    = $user->get_field('id');
+            my $name  = $user->get_field('name');
+            #my $blood = $user->get_field('blood');
+
+            is $id->sql_data_type,   SQL_INTEGER;
+            is $name->sql_data_type, SQL_VARCHAR;
+
+            is $id->is_primary_key, 1;
+            is $id->is_auto_increment, 1;
+
+            is $id->is_nullable,        0;
+            is $name->is_nullable,      0;
+            #is $blood->is_nullable,    1;
+
+            is $name->size, 255;
+        };
+
+        subtest 'author' => sub {
+            my $author = Bar::DSL->context->schema->get_table('author');
+            isa_ok $author, 'SQL::Translator::Schema::Table';
+
+            my $id     = $author->get_field('id');
+            my $name   = $author->get_field('name');
+            my $height = $author->get_field('height');
+
+            is $id->sql_data_type,      SQL_INTEGER;
+            is $name->sql_data_type,    SQL_VARCHAR;
+            is $height->sql_data_type,  SQL_DECIMAL;
+
+            is $id->is_primary_key, 1;
+            is $id->is_auto_increment, 1;
+
+            is $id->is_nullable,        0;
+            is $name->is_nullable,      0;
+            is $height->is_nullable,    1;
+
+            is_deeply [ $height->size ], [4,1];
+
+            is $id->is_foreign_key, 1;
+
+            # INDEX
+            my $height_idx = $author->get_indices->[0];
+            is $height_idx->name, 'height_idx';
+            is_deeply [ $height_idx->fields ], ['height'];
+
+            # FOREIGN_KEY
+            my $book_cons = $author->fkey_constraints->[0];
+            isa_ok $book_cons, 'SQL::Translator::Schema::Constraint';
+
+            is_deeply [ $book_cons->field_names ], ['id'];
+            is_deeply [ $book_cons->reference_fields ], ['author_id'];
+            is $book_cons->reference_table, 'book';
+        };
+
+        subtest 'book' => sub {
+            my $book   = Bar::DSL->context->schema->get_table('book');
+            isa_ok $book, 'SQL::Translator::Schema::Table';
+
+            my $id        = $book->get_field('id');
+            my $name      = $book->get_field('name');
+            my $author_id = $book->get_field('author_id');
+            my $price     = $book->get_field('price');
+
+            is $id->sql_data_type,          SQL_INTEGER;
+            is $name->sql_data_type,        SQL_VARCHAR;
+            is $author_id->sql_data_type,   SQL_INTEGER;
+            is $price->sql_data_type,       SQL_DECIMAL;
+
+            is $id->is_primary_key,     1;
+            is $id->is_auto_increment,  1;
+
+            is $id->is_nullable,        0;
+            is $name->is_nullable,      0;
+            is $author_id->is_nullable, 1;
+            is $price->is_nullable,     1;
+
+            is_deeply [ $price->size ], [4,2];
+
+            # FOREIGN_KEY
+            my $author_cons = $book->fkey_constraints->[0];
+            isa_ok $author_cons, 'SQL::Translator::Schema::Constraint';
+
+            is_deeply [ $author_cons->field_names ], ['author_id'];
+            is_deeply [ $author_cons->reference_fields ], ['id'];
+            is $author_cons->reference_table, 'author';
+        };
+    };
 };
 
 subtest "dump single table" => sub {
