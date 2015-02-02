@@ -1,127 +1,150 @@
 use strict;
 use warnings;
 use Test::More;
-use Test::Requires 'DBD::SQLite';
+use Test::Requires 'DBD::mysql';
+use Test::mysqld;
 use DBI;
 use DBIx::Schema::DSL::Dumper;
 
-# TODO mysql
-#use Test::mysqld;
-#my $mysqld = Test::mysqld->new(
-#    my_cnf => {
-#        'skip-networking' => '', # no TCP socket
-#    }
-#) or plan skip_all => $Test::mysqld::errstr;
-#my $dbh = DBI->connect($mysqld->dsn) or die 'cannot connect to db';
+
+package Foo::DSL;
+use warnings;
+use strict;
+use DBIx::Schema::DSL;
+
+database 'MySQL';
+
+create_table 'user' => columns {
+    integer 'id',   primary_key, auto_increment;
+    varchar 'name', null;
+};
+
+create_table 'book' => columns {
+    integer 'id',   primary_key, auto_increment;
+    varchar 'name', null;
+    integer 'author_id';
+    decimal 'price', 'size' => [4,2];
+
+    add_index 'author_id_idx' => ['author_id'];
+
+    belongs_to 'author';
+};
+
+create_table 'author' => columns {
+    primary_key 'id';
+    varchar 'name';
+    decimal 'height', 'precision' => 4, 'scale' => 1;
+
+    add_index 'height_idx' => ['height'];
+
+    has_many 'book';
+};
+
+
+package main;
+
+my $mysqld = Test::mysqld->new(
+    my_cnf => {
+        'skip-networking' => '', # no TCP socket
+    }
+) or plan skip_all => $Test::mysqld::errstr;
+
+my $dbh = DBI->connect($mysqld->dsn(dbname => 'test'), {RaiseError => 1}) or die 'cannot connect to db';
 
 # initialize
-my $dbh = DBI->connect('dbi:SQLite::memory:', '', '', {RaiseError => 1}) or die 'cannot connect to db';
-$dbh->do(q{
-    CREATE TABLE multi_pk (
-        pk1         INTEGER NOT NULL,
-        pk2         INTEGER NOT NULL,
-        PRIMARY KEY(pk1, pk2)
-    );
-});
+my $output = Foo::DSL->output;
 
-$dbh->do(q{
-    CREATE TABLE author (
-        id          INTEGER UNSIGNED AUTO_INCREMENT,
-        name        VARCHAR(32) NOT NULL,
-        type        VARCHAR(255) DEFAULT 'foo',
-        description VARCHAR(255),
-        created_at  DATETIME,
-
-        PRIMARY KEY (`id`),
-        FOREIGN KEY (`id`) REFERENCES `book` (`author_id`)
-   );
-});
-
-$dbh->do(q{
-    CREATE INDEX name_idx ON author (`name`);
-});
-$dbh->do(q{
-    CREATE INDEX type_description_idx ON author (`type`, `description`);
-});
-$dbh->do(q{
-    CREATE UNIQUE INDEX created_at_uniq ON author (`created_at`);
-});
-
-
-$dbh->do(q{
-    CREATE TABLE book (
-        id          INTEGER UNSIGNED AUTO_INCREMENT,
-        author_id   INTEGER,
-        name        VARCHAR(32),
-        created_at  DATETIME,
-
-        PRIMARY KEY (`id`)
-    );
-});
-        #FOREIGN KEY (`author_id`) REFERENCES `author` (`id`)
-
+$dbh->do($_) for split /;/, $output;
 
 subtest "dump all tables" => sub {
+
     # generate schema and eval.
     my $code = DBIx::Schema::DSL::Dumper->dump(
         dbh => $dbh,
-        pkg => 'Foo::DSL',
-        default_not_null => 1,
-        default_unsigned => 1,
+        pkg => 'Bar::DSL',
     );
+
     note $code;
-    ok 1;
     my $schema = eval $code;
     ::ok !$@, 'no syntax error';
     diag $@ if $@;
 
-# TODO
-#    {
-#        package Mock::DB;
-#        use parent 'Teng';
-#    }
-#
-#    my $db = Mock::DB->new(dbh => $dbh);
-#
-#    for my $table_name (qw/user1 user2 user3/) {
-#        my $user = $db->schema->get_table($table_name);
-#        is($user->name, $table_name);
-#        is(join(',', @{$user->primary_keys}), 'user_id');
-#        is(join(',', @{$user->columns}), 'user_id,name,email,created_on');
-#    }
-#
-#    my $row_class = $db->schema->get_row_class('user1');
-#    isa_ok $row_class, 'Mock::DB::Row::User1';
-#
-#    my $row = $db->insert('user1', +{name => 'nekokak', email => 'nekokak@gmail.com'});
-#    is $row->email, 'nekokak@gmail.com_deflate_inflate';
-#    is $row->get_column('email'), 'nekokak@gmail.com_deflate';
+    is Bar::DSL->context->db, 'MySQL';
+    ok !Bar::DSL->context->default_not_null;
+    ok !Bar::DSL->context->default_unsigned;
+
+    for my $table (Foo::DSL->context->schema->get_tables) {
+        my $other = Bar::DSL->context->schema->get_table($table->name);
+        TODO: {
+            local $TODO = 'wip';
+            is $table->equals($other), 1;
+        }
+    }
 };
 
-#subtest "dump single table" => sub {
-#    # generate schema and eval.
-#    my $code = Teng::Schema::Dumper->dump(
-#        dbh       => $dbh,
-#        namespace => 'Mock::DB',
-#        tables => 'user1',
-#    );
-#    note $code;
-#    like $code, qr/user1/;
-#    unlike $code, qr/user2/;
-#    unlike $code, qr/user3/;
-#};
-#
-#subtest "dump multiple tables" => sub {
-#    # generate schema and eval.
-#    my $code = Teng::Schema::Dumper->dump(
-#        dbh       => $dbh,
-#        namespace => 'Mock::DB',
-#        tables => [qw/user1 user2/],
-#    );
-#    note $code;
-#    like $code, qr/user1/;
-#    like $code, qr/user2/;
-#    unlike $code, qr/user3/;
-#};
+subtest "dump single table" => sub {
+    my $code = DBIx::Schema::DSL::Dumper->dump(
+        dbh    => $dbh,
+        tables => 'user',
+    );
+    #note $code;
+    like $code, qr/user/;
+    unlike $code, qr/author/;
+    unlike $code, qr/book/;
+};
+
+subtest "dump multiple tables" => sub {
+    my $code = DBIx::Schema::DSL::Dumper->dump(
+        dbh    => $dbh,
+        tables => [qw/author book/],
+    );
+    #note $code;
+    unlike $code, qr/user/;
+    like $code, qr/book/;
+    like $code, qr/author/;
+};
+
+subtest "default_unsigned" => sub {
+
+    my $code = DBIx::Schema::DSL::Dumper->dump(
+        dbh    => $dbh,
+        pkg    => 'Bar::Unsigned::DSL',
+        default_unsigned => 1,
+    );
+
+    my $schema = eval $code;
+    ok !!Bar::Unsigned::DSL->context->default_unsigned;
+    unlike $code, qr/ unsigned/;
+};
+
+subtest "default_not_null" => sub {
+
+    my $code = DBIx::Schema::DSL::Dumper->dump(
+        dbh    => $dbh,
+        pkg    => 'Bar::NotNull::DSL',
+        default_not_null => 1,
+    );
+
+    my $schema = eval $code;
+    ok !!Bar::NotNull::DSL->context->default_not_null;
+    unlike $code, qr/ not_null/;
+};
+
+subtest "table_options" => sub {
+
+    my $code = DBIx::Schema::DSL::Dumper->dump(
+        dbh => $dbh,
+        pkg => 'Bar::TableOptions::DSL',
+        table_options => +{
+            'mysql_table_type' => 'MyISAM',
+            'mysql_charset'    => 'latin1',
+        },
+    );
+
+    my $schema = eval $code;
+    is Bar::TableOptions::DSL->context->table_extra->{mysql_table_type} ,'MyISAM';
+    is Bar::TableOptions::DSL->context->table_extra->{mysql_charset} ,'latin1';
+};
+
 
 done_testing;

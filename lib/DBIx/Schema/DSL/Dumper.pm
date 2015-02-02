@@ -54,6 +54,16 @@ sub dump {
         $ret .= "default_not_null;\n" if $args{default_not_null};
         $ret .= "\n";
 
+        if ($args{table_options}) {
+            $ret .= "add_table_options\n";
+            my @table_options;
+            for my $key (keys %{$args{table_options}}) {
+                push @table_options => sprintf("    '%s' => '%s'", $key, $args{table_options}->{$key})
+            }
+            $ret .= join ",\n", @table_options;
+            $ret .= ";\n\n";
+        }
+
         for my $table_info (sort { $a->name cmp $b->name } $inspector->tables) {
             $ret .= _render_table($table_info, \%args);
         }
@@ -96,21 +106,37 @@ sub _render_column {
 
     $ret .= ", signed"   if $opt{signed};
     $ret .= ", unsigned" if $opt{unsigned} && !$args->{default_unsigned};
-    $ret .= sprintf(", size => %d", $column_info->column_size)  if defined $column_info->column_size;
+
+    if (defined $column_info->column_size) {
+        my $column_size = $column_info->column_size;
+        if (lc($type) eq 'decimal') {
+            # XXX
+            $column_size = sprintf("[%d, %d]", $column_info->column_size, $column_info->{DECIMAL_DIGITS});
+        }
+
+        $ret .= sprintf(", size => %s", $column_size)
+    }
 
     $ret .= ", null"     if $column_info->nullable;
     $ret .= ", not_null" if !$column_info->nullable && !$args->{default_not_null};
+
     if (defined $column_info->column_def) {
         my $column_def = $column_info->column_def;
 
-        # XXX workaround for SQLite ??
-        $column_def =~ s/^'//;
-        $column_def =~ s/'$//;
+        ## XXX workaround for SQLite ??
+        #$column_def =~ s/^'//;
+        #$column_def =~ s/'$//;
 
         $ret .= sprintf(", default => '%s'", $column_def)
     }
 
-    $ret .= ", auto_increment" if $opt{auto_increment};
+    if (
+        $opt{auto_increment} or
+        # XXX
+        ($args->{dbh}->{'Driver'}{'Name'} eq 'mysql' && $column_info->{MYSQL_IS_AUTO_INCREMENT})
+    ) {
+        $ret .= ", auto_increment"
+    }
 
     $ret .= ";\n";
 
