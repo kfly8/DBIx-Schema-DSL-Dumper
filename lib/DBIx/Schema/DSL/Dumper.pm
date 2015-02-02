@@ -104,7 +104,7 @@ sub _render_column {
 
     my %opt = map { lc($_) => 1 } @opt;
 
-    if (lc($type) eq 'enum') {
+    if (lc($type) =~ /^(enum|set)$/) {
         # XXX
         $ret .= sprintf(" => ['%s']", join "','", @{$column_info->{MYSQL_VALUES}});
     }
@@ -118,7 +118,7 @@ sub _render_column {
             # XXX
             $column_size = sprintf("[%d, %d]", $column_info->column_size, $column_info->{DECIMAL_DIGITS});
         }
-        elsif (lc($type) eq 'enum') {
+        elsif (lc($type) =~ /^(enum|set)$/) {
             undef $column_size;
         }
 

@@ -20,6 +20,7 @@ create_table 'user' => columns {
     varchar 'name', not_null;
     # MySQL datatype
     enum    'blood' => ['A', 'B', 'AB', 'O'], null;
+    set     'fav'   => ['sushi', 'niku', 'sake'], null;
 };
 
 create_table 'book' => columns {
@@ -91,12 +92,15 @@ subtest "dump all tables" => sub {
             my $id    = $user->get_field('id');
             my $name  = $user->get_field('name');
             my $blood = $user->get_field('blood');
+            my $fav   = $user->get_field('fav');
 
             is_deeply $blood->extra->{list}, ['A','B','AB','O'], 'enum list';
+            is_deeply $fav->extra->{list}, ['sushi','niku','sake'], 'set list';
 
             is $id->sql_data_type,      SQL_INTEGER;
             is $name->sql_data_type,    SQL_VARCHAR;
             is $blood->sql_data_type,   SQL_UNKNOWN_TYPE;
+            is $fav->sql_data_type,     SQL_UNKNOWN_TYPE;
 
             is $id->is_primary_key,     1;
             is $id->is_auto_increment,  1;
@@ -104,6 +108,7 @@ subtest "dump all tables" => sub {
             is $id->is_nullable,    0;
             is $name->is_nullable,  0;
             is $blood->is_nullable, 1;
+            is $fav->is_nullable,   1;
 
             is $name->size, 255;
         };
