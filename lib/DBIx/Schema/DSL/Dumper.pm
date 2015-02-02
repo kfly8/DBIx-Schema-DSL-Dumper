@@ -294,7 +294,7 @@ I haven't written document and test script yet.
 
 =head1 SEE ALSO
 
-L<Teng::Schema::Dumper>
+L<DBIx::Schema::DSL>, L<Teng::Schema::Dumper>
 
 =head1 LICENSE
 
