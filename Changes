@@ -2,6 +2,12 @@ Revision history for Perl extension DBIx-Schema-DSL-Dumper
 
 {{$NEXT}}
 
+0.03 2015-02-02T08:18:05Z
+    - added tests
+    - fixed bugs
+        - MySQL auto_increment
+    - support ENUM, SET type
+
 0.02 2015-02-01T14:24:48Z
     - update meta info 
 
