@@ -17,10 +17,11 @@ database 'MySQL';
 
 create_table 'user' => columns {
     integer 'id',   primary_key, auto_increment;
-    varchar 'name', not_null;
+    varchar 'name', size => 32, not_null;
     # MySQL datatype
     enum    'blood' => ['A', 'B', 'AB', 'O'], null;
     set     'fav'   => ['sushi', 'niku', 'sake'], null;
+    text    'description', null;
 };
 
 create_table 'book' => columns {
@@ -93,6 +94,7 @@ subtest "dump all tables" => sub {
             my $name  = $user->get_field('name');
             my $blood = $user->get_field('blood');
             my $fav   = $user->get_field('fav');
+            my $desc  = $user->get_field('description');
 
             is_deeply $blood->extra->{list}, ['A','B','AB','O'], 'enum list';
             is_deeply $fav->extra->{list}, ['sushi','niku','sake'], 'set list';
@@ -101,6 +103,7 @@ subtest "dump all tables" => sub {
             is $name->sql_data_type,    SQL_VARCHAR;
             is $blood->sql_data_type,   SQL_UNKNOWN_TYPE;
             is $fav->sql_data_type,     SQL_UNKNOWN_TYPE;
+            is $desc->sql_data_type,    SQL_LONGVARCHAR;
 
             is $id->is_primary_key,     1;
             is $id->is_auto_increment,  1;
@@ -109,8 +112,9 @@ subtest "dump all tables" => sub {
             is $name->is_nullable,  0;
             is $blood->is_nullable, 1;
             is $fav->is_nullable,   1;
+            is $desc->is_nullable,  1;
 
-            is $name->size, 255;
+            is $name->size, 32;
         };
 
         subtest 'author' => sub {
@@ -132,9 +136,9 @@ subtest "dump all tables" => sub {
             is $name->is_nullable,      0;
             is $height->is_nullable,    1;
 
+            # SIZE
+            is $name->size, 255;
             is_deeply [ $height->size ], [4,1];
-
-            is $id->is_foreign_key, 1;
 
             # INDEX
             my $height_idx = $author->get_indices->[0];

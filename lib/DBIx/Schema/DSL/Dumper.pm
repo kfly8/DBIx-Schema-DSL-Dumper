@@ -113,14 +113,26 @@ sub _render_column {
     $ret .= ", unsigned" if $opt{unsigned} && !$args->{default_unsigned};
 
     if (defined $column_info->column_size) {
-        my $column_size = $column_info->column_size;
+        my $column_size;
+
         if (lc($type) eq 'decimal') {
             # XXX
             $column_size = sprintf("[%d, %d]", $column_info->column_size, $column_info->{DECIMAL_DIGITS});
         }
         elsif (lc($type) =~ /^(enum|set)$/) {
-            undef $column_size;
+            ;;
         }
+        # TODO use DBIx::Schema::DSL->context->default_varchar_size
+        elsif (lc($type) eq 'varchar' && $column_info->column_size == 255) {
+            ;;
+        }
+        elsif ($column_info->{MYSQL_TYPE_NAME} && $column_info->{MYSQL_TYPE_NAME} !~ $column_info->column_size) {
+            ;;
+        }
+        else {
+            $column_size = $column_info->column_size;
+        }
+
 
         $ret .= sprintf(", size => %s", $column_size) if $column_size;
     }
