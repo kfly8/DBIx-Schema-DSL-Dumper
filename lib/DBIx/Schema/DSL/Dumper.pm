@@ -323,10 +323,24 @@ DBIx::Schema::DSL::Dumper - DBIx::Schema::DSL generator
     print DBIx::Schema::DSL::Dumper->dump(
         dbh => $dbh,
         pkg => 'Foo::DSL',
-        default_not_null => 1,
-        default_unsigned => 1,
+
+        # Optional. Default values is same as follows.
+        default_not_null => 0,
+        default_unsigned => 0,
+
+        # Optional.
+        table_options => +{
+            'mysql_table_type' => 'InnoDB',
+            'mysql_charset'    => 'utf8',
+        }
     );
 
+    # or
+
+    print DBIx::Schema::DSL::Dumper->dump(
+        dbh    => $dbh,
+        tables => [qw/foo bar/],
+    );
 
 =head1 DESCRIPTION
 
