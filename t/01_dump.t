@@ -16,12 +16,13 @@ use DBIx::Schema::DSL;
 database 'MySQL';
 
 create_table 'user' => columns {
-    integer 'id',   primary_key, auto_increment;
-    varchar 'name', size => 32, not_null;
+    integer   'id',   primary_key, auto_increment;
+    varchar   'name', size => 32, not_null, default => 'unknown';
     # MySQL datatype
-    enum    'blood' => ['A', 'B', 'AB', 'O'], null;
-    set     'fav'   => ['sushi', 'niku', 'sake'], null;
-    text    'description', null;
+    enum      'blood' => ['A', 'B', 'AB', 'O'], null;
+    set       'fav'   => ['sushi', 'niku', 'sake'], null;
+    text      'description', null;
+    timestamp 'updated_at', not_null, default => \'CURRENT_TIMESTAMP';
 };
 
 create_table 'book' => columns {
@@ -57,6 +58,7 @@ my $dbh = DBI->connect($mysqld->dsn(dbname => 'test'), {RaiseError => 1}) or die
 
 # initialize
 my $output = Foo::DSL->output;
+#note $output;
 
 $dbh->do($_) for grep { $_ !~ /^\s+$/ } split /;/, $output;
 
@@ -70,12 +72,14 @@ subtest "dump all tables" => sub {
 
     note $code;
     my $schema = eval $code;
+#    note Bar::DSL->output;
     ::ok !$@, 'no syntax error';
     diag $@ if $@;
 
     is Bar::DSL->context->db, 'MySQL';
     ok !Bar::DSL->context->default_not_null;
     ok !Bar::DSL->context->default_unsigned;
+
 
     for my $table (Foo::DSL->context->schema->get_tables) {
         my $other = Bar::DSL->context->schema->get_table($table->name);
@@ -96,6 +100,7 @@ subtest "dump all tables" => sub {
             my $blood = $user->get_field('blood');
             my $fav   = $user->get_field('fav');
             my $desc  = $user->get_field('description');
+            my $updated_at = $user->get_field('updated_at');
 
             is_deeply $blood->extra->{list}, ['A','B','AB','O'], 'enum list';
             is_deeply $fav->extra->{list}, ['sushi','niku','sake'], 'set list';
@@ -105,6 +110,7 @@ subtest "dump all tables" => sub {
             is $blood->sql_data_type,   SQL_UNKNOWN_TYPE;
             is $fav->sql_data_type,     SQL_UNKNOWN_TYPE;
             is $desc->sql_data_type,    SQL_LONGVARCHAR;
+            is $updated_at->sql_data_type,  SQL_TIMESTAMP;
 
             is $id->is_primary_key,     1;
             is $id->is_auto_increment,  1;
@@ -114,8 +120,12 @@ subtest "dump all tables" => sub {
             is $blood->is_nullable, 1;
             is $fav->is_nullable,   1;
             is $desc->is_nullable,  1;
+            is $updated_at->is_nullable, 0;
 
             is $name->size, 32;
+
+            is $name->default_value, 'unknown';
+            is ${$updated_at->default_value}, 'CURRENT_TIMESTAMP', 'CURRENT_TIMESTAMP is SCALAR REF';
         };
 
         subtest 'author' => sub {

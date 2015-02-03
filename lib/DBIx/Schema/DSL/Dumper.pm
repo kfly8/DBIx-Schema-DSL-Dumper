@@ -147,11 +147,12 @@ sub _render_column {
     if (defined $column_info->column_def) {
         my $column_def = $column_info->column_def;
 
-        ## XXX workaround for SQLite ??
-        #$column_def =~ s/^'//;
-        #$column_def =~ s/'$//;
-
-        $ret .= sprintf(", default => '%s'", $column_def)
+        if ($type =~ /^(TIMESTAMP|DATETIME)$/ && $column_def eq 'CURRENT_TIMESTAMP') {
+            $ret .= sprintf(", default => \\'%s'", $column_def)
+        }
+        else {
+            $ret .= sprintf(", default => '%s'", $column_def)
+        }
     }
 
     if (@{$args->{primary_key_names}} == 1 && $args->{primary_key_names}->[0] eq $column_info->name) {
