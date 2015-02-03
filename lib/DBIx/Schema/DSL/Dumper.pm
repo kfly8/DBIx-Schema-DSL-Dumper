@@ -81,6 +81,10 @@ sub _render_table {
 
     $ret .= sprintf("create_table '%s' => columns {\n", $table_info->name);
 
+    my @primary_key_names = map { $_->name } $table_info->primary_key;
+
+    $args = +{ %$args, primary_key_names => \@primary_key_names }; # XXX
+
     for my $col ($table_info->columns) {
         $ret .= _render_column($col, $table_info, $args);
     }
@@ -150,6 +154,10 @@ sub _render_column {
         $ret .= sprintf(", default => '%s'", $column_def)
     }
 
+    if (@{$args->{primary_key_names}} == 1 && $args->{primary_key_names}->[0] eq $column_info->name) {
+        $ret .= ", primary_key"
+    }
+
     if (
         $opt{auto_increment} or
         # XXX
@@ -166,22 +174,20 @@ sub _render_column {
 sub _render_index {
     my ($table_info, $args) = @_;
 
-    my @primary_key_names = map { $_->name } $table_info->primary_key;
-    my @fk_list           = $table_info->fk_foreign_keys;
+    my @fk_list = $table_info->fk_foreign_keys;
 
     my $ret = "";
 
     # primary key
-    if (@primary_key_names) {
+    if (@{$args->{primary_key_names}} > 1) {
         $ret .= "\n";
-        $ret .= sprintf("    set_primary_key('%s');\n", join "','", @primary_key_names);
+        $ret .= sprintf("    set_primary_key('%s');\n", join "','", @{$args->{primary_key_names}});
     }
-
 
     # index
     {
         my $itr = _statistics_info($args->{dbh}, $table_info);
-        my %pk_name = map { $_ => 1 } @primary_key_names;
+        my %pk_name = map { $_ => 1 } @{$args->{primary_key_names}};
         my %fk_name = map { $_->fkcolumn_name => 1 } @fk_list;
 
         my %index_info;
