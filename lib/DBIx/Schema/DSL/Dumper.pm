@@ -186,7 +186,7 @@ sub _render_index {
 
     # index
     {
-        my $itr = _statistics_info($args->{dbh}, $table_info);
+        my $itr = _statistics_info($args->{dbh}, $table_info->schema, $table_info->name);
         my %pk_name = map { $_ => 1 } @{$args->{primary_key_names}};
         my %fk_name = map { $_->fkcolumn_name => 1 } @fk_list;
 
@@ -213,13 +213,25 @@ sub _render_index {
     }
 
     # foreign key
+    # FIXME not supported UPDATE_RULE, DELETE_RULE
     if (@fk_list) {
         $ret .= "\n";
         for my $fk (@fk_list) {
             if ($fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
                 $ret .= sprintf("    belongs_to('%s')\n", $fk->pktable_name)
             }
-            else {
+            elsif ($fk->fkcolumn_name eq 'id' && $fk->pkcolumn_name eq sprintf('%s_id', $fk->fktable_name)) {
+
+                my $itr = _statistics_info($args->{dbh}, $table_info->schema, $fk->pktable_name);
+                while (my $index_key = $itr->next) {
+                    if ($index_key->column_name eq $fk->pkcolumn_name) {
+                        my $has = $index_key->non_unique ? 'has_many' : 'has_one';
+                        $ret .= sprintf("    %s('%s')\n", $has, $fk->pktable_name);
+                        last;
+                    }
+                }
+            }
+            elsif ($fk->fkcolumn_name && $fk->pktable_name && $fk->pkcolumn_name) {
                 $ret .= sprintf("    foreign_key('%s','%s','%s')\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
             }
         }
@@ -230,18 +242,25 @@ sub _render_index {
 
 # EXPERIMENTAL: https://metacpan.org/pod/DBI#statistics_info
 sub _statistics_info {
-    my ($dbh, $table_info) = @_;
+    my ($dbh, $schema, $table_name) = @_;
 
     my $sth;
     if ($dbh->{'Driver'}{'Name'} eq 'mysql') {
         # TODO p-r DBD::mysqld ??
-        $sth = $dbh->prepare(q/
-                SELECT * FROM INFORMATION_SCHEMA.STATISTICS WHERE table_schema = ? AND table_name = ?
-              /);
-        $sth->execute($table_info->schema, $table_info->name);
+        my $sql = q{
+            SELECT
+                 *
+            FROM
+                INFORMATION_SCHEMA.STATISTICS
+            WHERE
+                table_schema = ?
+                AND table_name = ?
+        };
+        $sth = $dbh->prepare($sql);
+        $sth->execute($schema, $table_name);
     }
     else {
-        $sth = $dbh->statistics_info(undef, undef, $table_info->name, undef, undef);
+        $sth = $dbh->statistics_info(undef, undef, $table_name, undef, undef);
     }
 
     DBIx::Inspector::Iterator->new(
