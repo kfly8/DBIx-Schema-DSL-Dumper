@@ -2,6 +2,12 @@ Revision history for Perl extension DBIx-Schema-DSL-Dumper
 
 {{$NEXT}}
 
+0.04 2015-02-03T14:29:46Z
+    - not treated as a constant CURRENT_TIMESTAMP 
+    - support has_one,has_many
+    - ignore default size
+    - not use set_primary_key when single primary key
+
 0.03 2015-02-02T08:18:05Z
     - added tests
     - fixed bugs
