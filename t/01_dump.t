@@ -30,6 +30,7 @@ create_table 'book' => columns {
     integer 'author_id';
     decimal 'price', 'size' => [4,2];
 
+    add_index 'name_price_idx' => ['name', 'price'];
     belongs_to 'author';
 };
 
@@ -177,6 +178,11 @@ subtest "dump all tables" => sub {
             is $price->is_nullable,     1;
 
             is_deeply [ $price->size ], [4,2];
+
+            # INDEX
+            my $name_price_idx = $book->get_indices->[0];
+            is $name_price_idx->name, 'name_price_idx';
+            is_deeply [ $name_price_idx->fields ], ['name', 'price'];
 
             # FOREIGN_KEY
             my $author_cons = $book->fkey_constraints->[0];
