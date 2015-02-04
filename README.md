@@ -32,11 +32,6 @@ DBIx::Schema::DSL::Dumper - DBIx::Schema::DSL generator
 
 This module generates the Perl code to generate DBIx::Schema::DSL.
 
-# WARNING
-
-IT'S STILL IN DEVELOPMENT PHASE.
-I haven't written document and test script yet.
-
 # SEE ALSO
 
 [DBIx::Schema::DSL](https://metacpan.org/pod/DBIx::Schema::DSL), [Teng::Schema::Dumper](https://metacpan.org/pod/Teng::Schema::Dumper)
