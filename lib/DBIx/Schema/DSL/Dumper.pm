@@ -134,6 +134,16 @@ sub _render_column {
         elsif (lc($type) eq 'varchar' && $column_info->column_size == 255) {
             ;;
         }
+        elsif (
+            lc($type) =~ /^(int|integer)$/ &&
+            (
+                $opt{unsigned} && $column_info->column_size == 10
+                or
+                !$opt{unsigned} && $column_info->column_size == 11
+            )
+        ) {
+            ;;
+        }
         elsif ($column_info->{MYSQL_TYPE_NAME} && $column_info->{MYSQL_TYPE_NAME} !~ $column_info->column_size) {
             ;;
         }

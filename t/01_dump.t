@@ -72,7 +72,7 @@ subtest "dump all tables" => sub {
 
     note $code;
     my $schema = eval $code;
-#    note Bar::DSL->output;
+    note Bar::DSL->output; # XXX required for translate
     ::ok !$@, 'no syntax error';
     diag $@ if $@;
 
@@ -83,10 +83,7 @@ subtest "dump all tables" => sub {
 
     for my $table (Foo::DSL->context->schema->get_tables) {
         my $other = Bar::DSL->context->schema->get_table($table->name);
-        TODO: {
-            local $TODO = 'wip';
-            is $table->equals($other), 1;
-        }
+        is $table->equals($other), 1;
     }
 
     subtest 'test each table' => sub {
