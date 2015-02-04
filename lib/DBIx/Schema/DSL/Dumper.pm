@@ -218,7 +218,7 @@ sub _render_index {
     if (@fk_list) {
         $ret .= "\n";
         for my $fk (@fk_list) {
-            if ($fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
+            if ($fk->pktable_name && $fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
                 $ret .= sprintf("    belongs_to('%s')\n", $fk->pktable_name)
             }
             elsif ($fk->fkcolumn_name eq 'id' && $fk->pkcolumn_name eq sprintf('%s_id', $fk->fktable_name)) {
