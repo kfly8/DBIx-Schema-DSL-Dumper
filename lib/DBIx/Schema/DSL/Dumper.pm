@@ -104,6 +104,10 @@ sub _render_column {
 
     my ($type, @opt) = split / /, $column_info->type_name;
 
+    if ($column_info->{MYSQL_TYPE_NAME}) {
+        push @opt => split / /, $column_info->{MYSQL_TYPE_NAME};
+    }
+
     $ret .= sprintf(", '%s'", $type);
 
     my %opt = map { lc($_) => 1 } @opt;

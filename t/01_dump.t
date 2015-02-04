@@ -16,7 +16,7 @@ use DBIx::Schema::DSL;
 database 'MySQL';
 
 create_table 'user' => columns {
-    integer   'id',   primary_key, auto_increment;
+    integer   'id',   unsigned, primary_key, auto_increment;
     varchar   'name', size => 32, not_null, default => 'unknown';
     # MySQL datatype
     enum      'blood' => ['A', 'B', 'AB', 'O'], null;
@@ -26,7 +26,7 @@ create_table 'user' => columns {
 };
 
 create_table 'book' => columns {
-    integer 'id',   primary_key, auto_increment;
+    integer 'id',   unsigned, primary_key, auto_increment;
     varchar 'name', not_null;
     integer 'author_id';
     decimal 'price', 'size' => [4,2];
@@ -126,6 +126,8 @@ subtest "dump all tables" => sub {
 
             is $name->default_value, 'unknown';
             is ${$updated_at->default_value}, 'CURRENT_TIMESTAMP', 'CURRENT_TIMESTAMP is SCALAR REF';
+
+            is $id->extra->{unsigned}, 1;
         };
 
         subtest 'author' => sub {
@@ -163,6 +165,8 @@ subtest "dump all tables" => sub {
             is_deeply [ $book_cons->field_names ], ['id'];
             is_deeply [ $book_cons->reference_fields ], ['author_id'];
             is $book_cons->reference_table, 'book';
+
+            ok not $id->extra->{unsigned};
         };
 
         subtest 'book' => sub {
@@ -188,6 +192,8 @@ subtest "dump all tables" => sub {
             is $price->is_nullable,     1;
 
             is_deeply [ $price->size ], [4,2];
+
+            is $id->extra->{unsigned}, 1;
 
             # INDEX
             my $name_price_idx = $book->get_indices->[0];
