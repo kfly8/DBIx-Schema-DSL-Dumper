@@ -2,6 +2,9 @@ Revision history for Perl extension DBIx-Schema-DSL-Dumper
 
 {{$NEXT}}
 
+0.06 2015-02-05T11:09:43Z
+    - fixed unique key bug.
+
 0.05 2015-02-04T09:27:40Z
     - fixed TODO test
     - fixed MySQL unsigned bug. 
