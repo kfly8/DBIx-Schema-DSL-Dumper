@@ -81,10 +81,6 @@ sub _render_table {
 
     $ret .= sprintf("create_table '%s' => columns {\n", $table_info->name);
 
-    my @primary_key_names = map { $_->name } $table_info->primary_key;
-
-    $args = +{ %$args, primary_key_names => \@primary_key_names }; # XXX
-
     for my $col ($table_info->columns) {
         $ret .= _render_column($col, $table_info, $args);
     }
@@ -169,10 +165,6 @@ sub _render_column {
         }
     }
 
-    if (@{$args->{primary_key_names}} == 1 && $args->{primary_key_names}->[0] eq $column_info->name) {
-        $ret .= ", primary_key"
-    }
-
     if (
         $opt{auto_increment} or
         # XXX
@@ -189,67 +181,67 @@ sub _render_column {
 sub _render_index {
     my ($table_info, $args) = @_;
 
-    my @fk_list = $table_info->fk_foreign_keys;
+    my @primary_key_names   = map { $_->name } $table_info->primary_key;
+    my @fk_list             = $table_info->fk_foreign_keys;
+    my %statistics_info_map = map {
+        $_->column_name => $_;
+    } _statistics_info($args->{dbh}, $table_info->schema, $table_info->name)->all;
 
     my $ret = "";
 
     # primary key
-    if (@{$args->{primary_key_names}} > 1) {
+    if (@primary_key_names) {
+        delete $statistics_info_map{$_} for @primary_key_names;
+
         $ret .= "\n";
-        $ret .= sprintf("    set_primary_key('%s');\n", join "','", @{$args->{primary_key_names}});
+        $ret .= sprintf("    set_primary_key('%s');\n", join "','", @primary_key_names);
     }
 
-    # index
-    {
-        my $itr = _statistics_info($args->{dbh}, $table_info->schema, $table_info->name);
-        my %pk_name = map { $_ => 1 } @{$args->{primary_key_names}};
-        my %fk_name = map { $_->fkcolumn_name => 1 } @fk_list;
+    # foreign key && stash index_info
+    my %index_info;
+    my $ret_foreign_key = "";
+    for my $fk (@fk_list) {
+        my $index_key = delete $statistics_info_map{$fk->fkcolumn_name};
 
-        my %index_info;
-        while (my $index_key = $itr->next) {
-            next if $pk_name{$index_key->column_name};
-            next if $fk_name{$index_key->column_name};
-
-            push @{$index_info{$index_key->index_name}} => $index_key;
+        # FIXME not supported UPDATE_RULE, DELETE_RULE
+        if ($fk->pktable_name && $fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
+            $ret_foreign_key .= sprintf("    belongs_to('%s')\n", $fk->pktable_name)
         }
+        elsif ($fk->fkcolumn_name eq 'id' && $fk->pkcolumn_name eq sprintf('%s_id', $fk->fktable_name)) {
 
-        $ret .= "\n" if %index_info;
-        for my $index_name (sort keys %index_info) {
-            my @index_keys = @{$index_info{$index_name}};
-            my @column_names = map { $_->column_name } @index_keys;
-
-            $ret .= sprintf("    add_%sindex('%s' => [%s]%s);\n",
-                        $index_keys[0]->non_unique ? '' : 'unique_',
-                        $index_name,
-                        (join ",", (map { q{'}.$_.q{'} } @column_names)),
-                        $index_keys[0]->non_unique && $index_keys[0]->type ? sprintf(", '%s'", $index_keys[0]->type) : '',
-                    );
-        }
-    }
-
-    # foreign key
-    # FIXME not supported UPDATE_RULE, DELETE_RULE
-    if (@fk_list) {
-        $ret .= "\n";
-        for my $fk (@fk_list) {
-            if ($fk->pktable_name && $fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
-                $ret .= sprintf("    belongs_to('%s')\n", $fk->pktable_name)
-            }
-            elsif ($fk->fkcolumn_name eq 'id' && $fk->pkcolumn_name eq sprintf('%s_id', $fk->fktable_name)) {
-
-                my $itr = _statistics_info($args->{dbh}, $table_info->schema, $fk->pktable_name);
-                while (my $index_key = $itr->next) {
-                    if ($index_key->column_name eq $fk->pkcolumn_name) {
-                        my $has = $index_key->non_unique ? 'has_many' : 'has_one';
-                        $ret .= sprintf("    %s('%s')\n", $has, $fk->pktable_name);
-                        last;
-                    }
+            my $itr = _statistics_info($args->{dbh}, $table_info->schema, $fk->pktable_name);
+            while (my $index_key = $itr->next) {
+                if ($index_key->column_name eq $fk->pkcolumn_name) {
+                    my $has = $index_key->non_unique ? 'has_many' : 'has_one';
+                    $ret_foreign_key .= sprintf("    %s('%s')\n", $has, $fk->pktable_name);
+                    last;
                 }
             }
-            elsif ($fk->fkcolumn_name && $fk->pktable_name && $fk->pkcolumn_name) {
-                $ret .= sprintf("    foreign_key('%s','%s','%s')\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
-            }
         }
+        elsif ($fk->fkcolumn_name && $fk->pktable_name && $fk->pkcolumn_name) {
+            $ret_foreign_key .= sprintf("    foreign_key('%s','%s','%s')\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
+        }
+        else {
+            push @{$index_info{$index_key->index_name}} => $index_key;
+        }
+    }
+
+    push @{$index_info{$_->index_name}} => $_ for values %statistics_info_map;
+
+    for my $index_name (sort keys %index_info) {
+        my @index_keys = @{$index_info{$index_name}};
+        my @column_names = map { $_->column_name } @index_keys;
+
+        $ret .= sprintf("    add_%sindex('%s' => [%s]%s);\n",
+                    $index_keys[0]->non_unique ? '' : 'unique_',
+                    $index_name,
+                    (join ",", (map { q{'}.$_.q{'} } @column_names)),
+                    $index_keys[0]->non_unique && $index_keys[0]->type ? sprintf(", '%s'", $index_keys[0]->type) : '',
+                );
+    }
+
+    if ($ret_foreign_key) {
+        $ret .= $ret_foreign_key;
     }
 
     return $ret;

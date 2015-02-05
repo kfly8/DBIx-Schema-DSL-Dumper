@@ -31,7 +31,7 @@ create_table 'book' => columns {
     integer 'author_id';
     decimal 'price', 'size' => [4,2];
 
-    add_index 'name_price_idx' => ['name', 'price'];
+    add_unique_index 'name_price_idx' => ['name', 'price'];
     belongs_to 'author';
 };
 
@@ -151,7 +151,10 @@ subtest "dump all tables" => sub {
             is_deeply [ $height->size ], [4,1];
 
             # INDEX
-            my $height_idx = $author->get_indices->[0];
+            my %index = map { $_->name => $_ } $author->get_indices;
+
+            is scalar keys %index, 1;
+            my $height_idx = $index{height_idx};
             is $height_idx->name, 'height_idx';
             is_deeply [ $height_idx->fields ], ['height'];
 
@@ -193,8 +196,11 @@ subtest "dump all tables" => sub {
             is $id->extra->{unsigned}, 1;
 
             # INDEX
-            my $name_price_idx = $book->get_indices->[0];
-            is $name_price_idx->name, 'name_price_idx';
+            my %index = map { $_->name => $_ } $book->get_indices;
+
+            is scalar keys %index, 1;
+            my $name_price_idx = $index{name_price_idx};
+            is lc($name_price_idx->type), 'unique';
             is_deeply [ $name_price_idx->fields ], ['name', 'price'];
 
             # FOREIGN_KEY
