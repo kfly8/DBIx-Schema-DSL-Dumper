@@ -181,19 +181,19 @@ sub _render_column {
 sub _render_index {
     my ($table_info, $args) = @_;
 
-    my @primary_key_names   = map { $_->name } $table_info->primary_key;
     my @fk_list             = $table_info->fk_foreign_keys(+{ pk_schema => $table_info->schema });
     my %statistics_info_map = map {
         $_->column_name => $_;
     } _statistics_info($args->{dbh}, $table_info->schema, $table_info->name)->all;
 
     my $ret = "";
+    $ret .= "\n";
 
     # primary key
-    if (@primary_key_names) {
-        delete $statistics_info_map{$_} for @primary_key_names;
+    if (my @primary_keys = $table_info->primary_key) {
+        delete $statistics_info_map{$_->name} for @primary_keys;
 
-        $ret .= "\n";
+        my @primary_key_names = map { $_->name } sort { $a->{KEY_SEQ} <=> $b->{KEY_SEQ} } @primary_keys;
         $ret .= sprintf("    set_primary_key('%s');\n", join "','", @primary_key_names);
     }
 
