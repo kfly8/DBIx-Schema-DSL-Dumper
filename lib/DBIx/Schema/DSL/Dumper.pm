@@ -182,7 +182,7 @@ sub _render_index {
     my ($table_info, $args) = @_;
 
     my @primary_key_names   = map { $_->name } $table_info->primary_key;
-    my @fk_list             = $table_info->fk_foreign_keys;
+    my @fk_list             = $table_info->fk_foreign_keys(+{ pk_schema => $table_info->schema });
     my %statistics_info_map = map {
         $_->column_name => $_;
     } _statistics_info($args->{dbh}, $table_info->schema, $table_info->name)->all;
@@ -221,8 +221,11 @@ sub _render_index {
         elsif ($fk->fkcolumn_name && $fk->pktable_name && $fk->pkcolumn_name) {
             $ret_foreign_key .= sprintf("    foreign_key('%s','%s','%s')\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
         }
-        else {
+        elsif($index_key) {
             push @{$index_info{$index_key->index_name}} => $index_key;
+        }
+        else {
+            warn sprintf('something wrong... table_name:%s, fkcolumn_name:%s', $table_info->name, $fk->fkcolumn_name);
         }
     }
 
