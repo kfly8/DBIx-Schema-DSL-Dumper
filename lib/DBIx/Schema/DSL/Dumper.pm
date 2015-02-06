@@ -181,70 +181,67 @@ sub _render_column {
 sub _render_index {
     my ($table_info, $args) = @_;
 
-    my @fk_list             = $table_info->fk_foreign_keys(+{ pk_schema => $table_info->schema });
-    my %statistics_info_map = map {
-        $_->column_name => $_;
-    } _statistics_info($args->{dbh}, $table_info->schema, $table_info->name)->all;
-
     my $ret = "";
-    $ret .= "\n";
 
-    # primary key
-    if (my @primary_keys = $table_info->primary_key) {
-        delete $statistics_info_map{$_->name} for @primary_keys;
+    # index
+    my $ret_primary_key = "";
+    my $ret_index_key   = "";
 
-        my @primary_key_names = map { $_->name } sort { $a->{KEY_SEQ} <=> $b->{KEY_SEQ} } @primary_keys;
-        $ret .= sprintf("    set_primary_key('%s');\n", join "','", @primary_key_names);
+    my %statistics_info_map;
+    my $statistics_info = _statistics_info($args->{dbh}, $table_info->schema, $table_info->name);
+    while (my $statistics = $statistics_info->next) {
+        push @{$statistics_info_map{$statistics->index_name}} => $statistics;
     }
 
-    # foreign key && stash index_info
-    my %index_info;
-    my $ret_foreign_key = "";
-    for my $fk (@fk_list) {
-        my $index_key = delete $statistics_info_map{$fk->fkcolumn_name};
+    for my $index_name (sort keys %statistics_info_map) {
+        my @statistics_list = @{$statistics_info_map{$index_name}};
+        my @column_names = map { $_->column_name } sort { $a->{ORDINAL_POSITION} <=> $b->{ORDINAL_POSITION} } @statistics_list;
 
-        # FIXME not supported UPDATE_RULE, DELETE_RULE
-        if ($fk->pktable_name && $fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
-            $ret_foreign_key .= sprintf("    belongs_to('%s')\n", $fk->pktable_name)
-        }
-        elsif ($fk->fkcolumn_name eq 'id' && $fk->pkcolumn_name eq sprintf('%s_id', $fk->fktable_name)) {
-
-            my $itr = _statistics_info($args->{dbh}, $table_info->schema, $fk->pktable_name);
-            while (my $index_key = $itr->next) {
-                if ($index_key->column_name eq $fk->pkcolumn_name) {
-                    my $has = $index_key->non_unique ? 'has_many' : 'has_one';
-                    $ret_foreign_key .= sprintf("    %s('%s')\n", $has, $fk->pktable_name);
-                    last;
-                }
-            }
-        }
-        elsif ($fk->fkcolumn_name && $fk->pktable_name && $fk->pkcolumn_name) {
-            $ret_foreign_key .= sprintf("    foreign_key('%s','%s','%s')\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
-        }
-        elsif($index_key) {
-            push @{$index_info{$index_key->index_name}} => $index_key;
+        if (lc($index_name) eq 'primary') {
+            $ret_primary_key .= sprintf("    set_primary_key('%s');\n", join "','", @column_names);
         }
         else {
-            warn sprintf('something wrong... table_name:%s, fkcolumn_name:%s', $table_info->name, $fk->fkcolumn_name);
+            $ret_index_key .= sprintf("    add_%sindex('%s' => [%s]%s);\n",
+                                $statistics_list[0]->non_unique ? '' : 'unique_',
+                                $index_name,
+                                (join ",", (map { q{'}.$_.q{'} } @column_names)),
+                                $statistics_list[0]->non_unique &&
+                                $statistics_list[0]->type && lc($statistics_list[0]->type) ne 'btree' ? sprintf(", '%s'", $statistics_list[0]->type) : '',
+                            );
         }
     }
 
-    push @{$index_info{$_->index_name}} => $_ for values %statistics_info_map;
+    # foreign key
+    my $ret_foreign_key = "";
+    if (my @fk_list = $table_info->fk_foreign_keys(+{ pk_schema => $table_info->schema })) {
+        for my $fk (@fk_list) {
 
-    for my $index_name (sort keys %index_info) {
-        my @index_keys = @{$index_info{$index_name}};
-        my @column_names = map { $_->column_name } @index_keys;
+            # FIXME not supported UPDATE_RULE, DELETE_RULE
+            if ($fk->pktable_name && $fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
+                $ret_foreign_key .= sprintf("    belongs_to('%s')\n", $fk->pktable_name)
+            }
+            elsif ($fk->fkcolumn_name eq 'id' && $fk->pkcolumn_name eq sprintf('%s_id', $fk->fktable_name)) {
 
-        $ret .= sprintf("    add_%sindex('%s' => [%s]%s);\n",
-                    $index_keys[0]->non_unique ? '' : 'unique_',
-                    $index_name,
-                    (join ",", (map { q{'}.$_.q{'} } @column_names)),
-                    $index_keys[0]->non_unique && $index_keys[0]->type ? sprintf(", '%s'", $index_keys[0]->type) : '',
-                );
+                my $itr = _statistics_info($args->{dbh}, $table_info->schema, $fk->pktable_name);
+                while (my $index_key = $itr->next) {
+                    if ($index_key->column_name eq $fk->pkcolumn_name) {
+                        my $has = $index_key->non_unique ? 'has_many' : 'has_one';
+                        $ret_foreign_key .= sprintf("    %s('%s')\n", $has, $fk->pktable_name);
+                        last;
+                    }
+                }
+            }
+            elsif ($fk->fkcolumn_name && $fk->pktable_name && $fk->pkcolumn_name) {
+                $ret_foreign_key .= sprintf("    foreign_key('%s','%s','%s')\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
+            }
+        }
     }
 
-    if ($ret_foreign_key) {
-        $ret .= $ret_foreign_key;
+    if ($ret_primary_key or $ret_index_key or $ret_foreign_key) {
+        $ret .= "\n";
+        $ret .= $ret_primary_key if $ret_primary_key;
+        $ret .= $ret_index_key   if $ret_index_key;
+        $ret .= $ret_foreign_key if $ret_foreign_key;
     }
 
     return $ret;
@@ -259,7 +256,25 @@ sub _statistics_info {
         # TODO p-r DBD::mysqld ??
         my $sql = q{
             SELECT
-                 *
+                TABLE_CATALOG AS TABLE_CAT,
+                TABLE_SCHEMA  AS TABLE_SCHEM,
+                TABLE_NAME,
+                NON_UNIQUE,
+                NULL          AS INDEX_QUALIFIER,
+                INDEX_NAME,
+                INDEX_TYPE    AS TYPE,
+                SEQ_IN_INDEX  AS ORDINAL_POSITION,
+                COLUMN_NAME,
+                NULL          AS ASC_OR_DESC,
+                CARDINALITY,
+                NULL          AS PAGES,
+                NULL          AS FILTER_CONDITION,
+
+                SUB_PART,
+                PACKED,
+                NULLABLE,
+                INDEX_TYPE,
+                COMMENT
             FROM
                 INFORMATION_SCHEMA.STATISTICS
             WHERE
