@@ -193,7 +193,7 @@ sub _render_index {
     for my $fk (@fk_list) {
 
         if ($fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
-            $ret_foreign_key .= sprintf("    belongs_to('%s')\n", $fk->pktable_name)
+            $ret_foreign_key .= sprintf("    belongs_to '%s';\n", $fk->pktable_name)
         }
         elsif ($fk->fkcolumn_name eq 'id' && $fk->pkcolumn_name eq sprintf('%s_id', $fk->fktable_name)) {
 
@@ -201,13 +201,13 @@ sub _render_index {
             while (my $index_key = $itr->next) {
                 if ($index_key->column_name eq $fk->pkcolumn_name) {
                     my $has = $index_key->non_unique ? 'has_many' : 'has_one';
-                    $ret_foreign_key .= sprintf("    %s('%s')\n", $has, $fk->pktable_name);
+                    $ret_foreign_key .= sprintf("    %s '%s'\n", $has, $fk->pktable_name);
                     last;
                 }
             }
         }
         elsif ($fk->pktable_name && $fk->pkcolumn_name) {
-            $ret_foreign_key .= sprintf("    foreign_key('%s','%s','%s')\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
+            $ret_foreign_key .= sprintf("    foreign_key '%s' => '%s','%s'\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
         }
     }
 
@@ -223,13 +223,13 @@ sub _render_index {
         my @column_names = map { $_->column_name } sort { $a->{ORDINAL_POSITION} <=> $b->{ORDINAL_POSITION} } @statistics_list;
 
         if (lc($index_name) eq 'primary') {
-            $ret_primary_key .= sprintf("    set_primary_key('%s');\n", join "','", @column_names);
+            $ret_primary_key .= sprintf("    set_primary_key '%s';\n", join "','", @column_names);
         }
         else {
             # fkcolumn is index automatically
             next if @column_names == 1 && $fkcolumn_map{$column_names[0]};
 
-            $ret_index_key .= sprintf("    add_%sindex('%s' => [%s]%s);\n",
+            $ret_index_key .= sprintf("    add_%sindex '%s' => [%s]%s;\n",
                                 $statistics_list[0]->non_unique ? '' : 'unique_',
                                 $index_name,
                                 (join ",", (map { q{'}.$_.q{'} } @column_names)),
