@@ -155,7 +155,6 @@ subtest "dump all tables" => sub {
 
             is scalar keys %index, 1;
             my $height_idx = $index{height_idx};
-            is $height_idx->name, 'height_idx';
             is_deeply [ $height_idx->fields ], ['height'];
 
             # FOREIGN_KEY

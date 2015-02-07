@@ -178,6 +178,7 @@ sub _render_column {
     return $ret;
 }
 
+# FIXME not supported UPDATE_RULE, DELETE_RULE
 sub _render_index {
     my ($table_info, $args) = @_;
 
@@ -186,7 +187,31 @@ sub _render_index {
     # index
     my $ret_primary_key = "";
     my $ret_index_key   = "";
+    my $ret_foreign_key = "";
 
+    my @fk_list = $table_info->fk_foreign_keys(+{ pk_schema => $table_info->schema });
+    for my $fk (@fk_list) {
+
+        if ($fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
+            $ret_foreign_key .= sprintf("    belongs_to('%s')\n", $fk->pktable_name)
+        }
+        elsif ($fk->fkcolumn_name eq 'id' && $fk->pkcolumn_name eq sprintf('%s_id', $fk->fktable_name)) {
+
+            my $itr = _statistics_info($args->{dbh}, $table_info->schema, $fk->pktable_name);
+            while (my $index_key = $itr->next) {
+                if ($index_key->column_name eq $fk->pkcolumn_name) {
+                    my $has = $index_key->non_unique ? 'has_many' : 'has_one';
+                    $ret_foreign_key .= sprintf("    %s('%s')\n", $has, $fk->pktable_name);
+                    last;
+                }
+            }
+        }
+        elsif ($fk->pktable_name && $fk->pkcolumn_name) {
+            $ret_foreign_key .= sprintf("    foreign_key('%s','%s','%s')\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
+        }
+    }
+
+    my %fkcolumn_map = map { $_->fkcolumn_name => $_ } @fk_list;
     my %statistics_info_map;
     my $statistics_info = _statistics_info($args->{dbh}, $table_info->schema, $table_info->name);
     while (my $statistics = $statistics_info->next) {
@@ -201,6 +226,9 @@ sub _render_index {
             $ret_primary_key .= sprintf("    set_primary_key('%s');\n", join "','", @column_names);
         }
         else {
+            # fkcolumn is index automatically
+            next if @column_names == 1 && $fkcolumn_map{$column_names[0]};
+
             $ret_index_key .= sprintf("    add_%sindex('%s' => [%s]%s);\n",
                                 $statistics_list[0]->non_unique ? '' : 'unique_',
                                 $index_name,
@@ -208,32 +236,6 @@ sub _render_index {
                                 $statistics_list[0]->non_unique &&
                                 $statistics_list[0]->type && lc($statistics_list[0]->type) ne 'btree' ? sprintf(", '%s'", $statistics_list[0]->type) : '',
                             );
-        }
-    }
-
-    # foreign key
-    my $ret_foreign_key = "";
-    if (my @fk_list = $table_info->fk_foreign_keys(+{ pk_schema => $table_info->schema })) {
-        for my $fk (@fk_list) {
-
-            # FIXME not supported UPDATE_RULE, DELETE_RULE
-            if ($fk->pktable_name && $fk->fkcolumn_name eq sprintf('%s_id', $fk->pktable_name)) {
-                $ret_foreign_key .= sprintf("    belongs_to('%s')\n", $fk->pktable_name)
-            }
-            elsif ($fk->fkcolumn_name eq 'id' && $fk->pkcolumn_name eq sprintf('%s_id', $fk->fktable_name)) {
-
-                my $itr = _statistics_info($args->{dbh}, $table_info->schema, $fk->pktable_name);
-                while (my $index_key = $itr->next) {
-                    if ($index_key->column_name eq $fk->pkcolumn_name) {
-                        my $has = $index_key->non_unique ? 'has_many' : 'has_one';
-                        $ret_foreign_key .= sprintf("    %s('%s')\n", $has, $fk->pktable_name);
-                        last;
-                    }
-                }
-            }
-            elsif ($fk->fkcolumn_name && $fk->pktable_name && $fk->pkcolumn_name) {
-                $ret_foreign_key .= sprintf("    foreign_key('%s','%s','%s')\n", $fk->fkcolumn_name, $fk->pktable_name, $fk->pkcolumn_name);
-            }
         }
     }
 
