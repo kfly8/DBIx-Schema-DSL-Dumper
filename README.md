@@ -1,3 +1,7 @@
+# CAUTION
+THIS MODULE IS NOT MAINTAINED ANYMORE.
+PLEASE USE [SQL::Translator::Producer::DBIxSchemaDSL(https://metacpan.org/pod/SQL::Translator::Producer::DBIxSchemaDSL) INSTEAD.
+
 # NAME
 
 DBIx::Schema::DSL::Dumper - DBIx::Schema::DSL generator
